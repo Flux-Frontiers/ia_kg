@@ -18,6 +18,8 @@ python   = ">=3.12,<3.14"
 click    = ">=8.1.0"
 kg-rag   = { git = "https://github.com/Flux-Frontiers/KGRAG.git" }
 doc-kg   = { git = "https://github.com/Flux-Frontiers/doc_kg.git" }
+kgmodule-utils = "^0.2.0"
+
 
 [tool.poetry.group.dev.dependencies]
 pytest = ">=8.0.0"

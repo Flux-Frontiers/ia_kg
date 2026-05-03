@@ -661,10 +661,11 @@ def download_book(
 
 def search_ia(query: str, max_results: int = 25) -> list[dict]:
     """Search Internet Archive texts. Returns list of result dicts."""
+    # Embed mediatype:texts in the query — IA no longer accepts it as a separate param.
+    full_query = f"({query}) AND mediatype:texts"
     params = urllib.parse.urlencode(
         {
-            "q": query,
-            "mediatype": "texts",
+            "q": full_query,
             "output": "json",
             "rows": str(max_results),
             "fl[]": ["identifier", "title", "creator", "date", "publisher"],
