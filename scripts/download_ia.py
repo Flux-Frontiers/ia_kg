@@ -743,6 +743,23 @@ def cmd_search(args: argparse.Namespace) -> int:
     for r in results:
         print(f"{r['identifier']:<{id_w}} {r['date']:<6} {r['title']}")
     print(f"\n{len(results)} result(s).")
+
+    export_path = getattr(args, "export_catalog", None)
+    if export_path:
+        out = Path(export_path)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        with out.open("w") as f:
+            f.write(f"# Catalog draft — IA search: {query}\n")
+            f.write("# Review identifiers before downloading.\n")
+            f.write("# Format: <identifier>[TAB<title>]  (comment lines start with #)\n\n")
+            for r in results:
+                line = r["identifier"]
+                if r["title"]:
+                    line += f"\t{r['title']}"
+                f.write(f"# {line}\n")
+        print(f"Draft catalog written to: {out}")
+        print("Uncomment lines you want to keep, then run: iakg download catalog <file>")
+
     return 0
 
 
@@ -852,6 +869,11 @@ def build_parser() -> argparse.ArgumentParser:
     sp = sub.add_parser("search", help="Search Internet Archive for texts")
     sp.add_argument("query", nargs="+", help="Search terms")
     sp.add_argument("-n", type=int, default=25, metavar="N", help="Max results (default 25)")
+    sp.add_argument(
+        "--export-catalog",
+        metavar="FILE",
+        help="Write results as a commented draft catalog .txt file",
+    )
 
     # download
     sp = sub.add_parser("download", help="Download a single IA item by identifier")

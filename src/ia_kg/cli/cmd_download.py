@@ -26,11 +26,17 @@ def download() -> None:
 @download.command("search")
 @click.argument("query", nargs=-1, required=True)
 @click.option("-n", default=25, show_default=True, help="Max results")
-def search_cmd(query: tuple[str, ...], n: int) -> None:
+@click.option(
+    "--export-catalog",
+    default=None,
+    metavar="FILE",
+    help="Write results as a commented draft catalog .txt file",
+)
+def search_cmd(query: tuple[str, ...], n: int, export_catalog: str | None) -> None:
     """Search Internet Archive for texts."""
     import argparse
 
-    args = argparse.Namespace(query=list(query), n=n)
+    args = argparse.Namespace(query=list(query), n=n, export_catalog=export_catalog)
     sys.exit(cmd_search(args))
 
 

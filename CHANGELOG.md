@@ -8,12 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `iakg download search --export-catalog FILE`: new flag writes all search results to a commented-out draft catalog `.txt` file. Every line is prefixed with `#` so nothing downloads accidentally; uncomment desired entries before running `iakg download catalog`.
+- `docs/catalog-workflow.md`: step-by-step guide covering search → export-catalog → curate → test one book → bulk download → survey → ingest.
 
 ### Changed
 
 ### Removed
 
 ### Fixed
+- `.github/workflows/ci.yml`: replaced invalid `poetry install --only dev` with `poetry install --extras dev` in both `lint` and `test` jobs. `--only` targets Poetry dependency *groups*; `dev` is a PEP 621 *extra*, so the old command errored in CI.
 
 ## [0.1.0] - 2026-05-03
 
