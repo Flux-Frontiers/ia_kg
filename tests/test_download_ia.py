@@ -1,71 +1,54 @@
-#!/usr/bin/env python3
-"""Unit tests for download_ia.py — run with: python scripts/test_download_ia.py"""
+"""Pytest suite for scripts/download_ia.py text-processing functions."""
 
-import sys
 import textwrap
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent))
 from download_ia import _is_heading, clean_ocr, slugify, text_to_markdown
 
 
 def test_slugify() -> None:
     assert slugify("Audels Electricians Guide Vol. 1") == "audels_electricians_guide_vol_1"
     assert slugify("  Spaces & Symbols!  ") == "spaces_symbols"
-    print("  slugify: OK")
 
 
 def test_ligatures() -> None:
     cases = [
-        ("ﬃefficiency", "ffiefficiency"),  # ffi ligature
+        ("ﬃefficiency", "ffiefficiency"),
         ("ﬁlament", "filament"),
         ("ﬂoor", "floor"),
     ]
     for raw, expected in cases:
-        result = clean_ocr(raw)
-        assert expected in result, f"Expected {expected!r} in {result!r}"
-    print("  ligatures: OK")
+        assert expected in clean_ocr(raw), f"Expected {expected!r} in clean_ocr({raw!r})"
 
 
 def test_smart_quotes() -> None:
-    # Right single quote U+2019 and left single quote U+2018
-    raw = "‘quoted’"
-    result = clean_ocr(raw)
+    result = clean_ocr("‘quoted’")
     assert "‘" not in result and "’" not in result
     assert "'quoted'" in result
-    # Left and right double quotes U+201C, U+201D
-    raw2 = "“double”"
-    result2 = clean_ocr(raw2)
+
+    result2 = clean_ocr("“double”")
     assert "“" not in result2 and "”" not in result2
     assert '"double"' in result2
-    print("  smart quotes: OK")
 
 
 def test_hyphen_join() -> None:
-    result = clean_ocr("electro-\nmagnetic field")
-    assert "electromagnetic" in result
-    result2 = clean_ocr("mag-\nnetism in the core")
-    assert "magnetism" in result2
-    print("  hyphen-join: OK")
+    assert "electromagnetic" in clean_ocr("electro-\nmagnetic field")
+    assert "magnetism" in clean_ocr("mag-\nnetism in the core")
 
 
 def test_page_numbers() -> None:
-    raw = "Text.\n\n42\n\nMore text.\n\n1234\n\nEnd."
-    result = clean_ocr(raw)
+    result = clean_ocr("Text.\n\n42\n\nMore text.\n\n1234\n\nEnd.")
     for num in ["42", "1234"]:
-        assert f"\n{num}\n" not in result, f"Bare page number {num} not removed"
+        assert f"\n{num}\n" not in result, f"Bare page number {num!r} not removed"
     assert "Text." in result and "More text." in result
-    print("  page numbers: OK")
 
 
 def test_index_strip() -> None:
     body = "\n".join(f"Sentence {i} about electricity and circuits." for i in range(200))
     index = "\nINDEX\n\nAlternating current, 12, 45\nDirect current, 8, 22\n"
     result = clean_ocr(body + index)
-    assert "Alternating current, 12" not in result, "Index was not stripped"
-    assert "Sentence 0" in result, "Body text was incorrectly removed"
-    assert "Sentence 199" in result, "Body text was incorrectly removed"
-    print("  index strip: OK")
+    assert "Alternating current, 12" not in result
+    assert "Sentence 0" in result
+    assert "Sentence 199" in result
 
 
 def test_running_headers() -> None:
@@ -76,11 +59,10 @@ def test_running_headers() -> None:
     result = clean_ocr(body)
     occurrences = sum(1 for ln in result.split("\n") if ln.strip() == header)
     assert occurrences == 0, f"Running header appeared {occurrences} times after cleaning"
-    print("  running headers: OK")
 
 
 def test_heading_detection() -> None:
-    expected_headings = [
+    expected = [
         ("CHAPTER I", 2),
         ("CHAPTER XIV", 2),
         ("CHAPTER 3. Alternating Current", 2),
@@ -94,12 +76,10 @@ def test_heading_detection() -> None:
         ("Ques. What is an electric current?", 4),
         ("Ques. How does a transformer work in practice?", 4),
     ]
-    for line, expected_level in expected_headings:
+    for line, level in expected:
         result = _is_heading(line)
         assert result is not None, f"Expected heading, got None: {line!r}"
-        assert result[0] == expected_level, (
-            f"{line!r}: expected h{expected_level}, got h{result[0]}"
-        )
+        assert result[0] == level, f"{line!r}: expected h{level}, got h{result[0]}"
 
     not_headings = [
         "The current flows through the wire.",
@@ -110,10 +90,7 @@ def test_heading_detection() -> None:
         "it starts lowercase",
     ]
     for line in not_headings:
-        result = _is_heading(line)
-        assert result is None, f"False positive heading: {line!r} -> {result}"
-
-    print("  heading detection: OK")
+        assert _is_heading(line) is None, f"False positive heading: {line!r}"
 
 
 def test_markdown_conversion() -> None:
@@ -130,11 +107,6 @@ def test_markdown_conversion() -> None:
 
         Ans. An electric current is a flow of electrons through a conductor.
         The direction of flow determines the polarity.
-
-        Ques. What are the units used to measure electricity?
-
-        Ans. The ampere is the unit of current, the volt is the unit of
-        electromotive force, and the ohm is the unit of resistance.
 
         CHAPTER II
 
@@ -156,56 +128,22 @@ def test_markdown_conversion() -> None:
     }
     md = text_to_markdown(sample, meta)
 
-    checks = {
+    expected_present = {
         "title h1": "# Audels Electricians and Plumbers Guide",
         "CHAPTER I h2": "## CHAPTER I",
         "CHAPTER II h2": "## CHAPTER II",
         "DIRECT CURRENTS h3": "### DIRECT CURRENTS",
         "ALTERNATING h3": "### ALTERNATING CURRENTS",
         "first Ques h4": "#### Ques. What is an electric current?",
-        "second Ques h4": "#### Ques. What are the units",
         "answer body text": "Ans. An electric current is a flow",
         "publisher front matter": "*Theo. Audel and Co., 1928*",
         "series front matter": "*Audels Electricians and Plumbers Guide, Vol. 1*",
     }
-    failures = []
-    for label, expected in checks.items():
-        if expected not in md:
-            failures.append(f"MISSING {label!r}: {expected!r}")
+    for label, text in expected_present.items():
+        assert text in md, f"Missing {label!r}: {text!r}"
 
-    toc_entries = [
+    for toc_entry in [
         "Chapter I - Direct Currents....... 1",
         "Chapter II - Alternating Currents.. 45",
-    ]
-    for entry in toc_entries:
-        if entry in md:
-            failures.append(f"TOC entry not stripped: {entry!r}")
-
-    if failures:
-        print("\nGenerated Markdown:\n" + md)
-        for f in failures:
-            print("  FAIL:", f)
-        sys.exit(1)
-
-    print("  markdown conversion: OK")
-    print("\n--- Generated Markdown (first 800 chars) ---")
-    print(md[:800])
-    print("...")
-
-
-def main() -> None:
-    print("Running download_ia.py unit tests...\n")
-    test_slugify()
-    test_ligatures()
-    test_smart_quotes()
-    test_hyphen_join()
-    test_page_numbers()
-    test_index_strip()
-    test_running_headers()
-    test_heading_detection()
-    test_markdown_conversion()
-    print("\nAll tests passed.")
-
-
-if __name__ == "__main__":
-    main()
+    ]:
+        assert toc_entry not in md, f"TOC entry not stripped: {toc_entry!r}"

@@ -1,4 +1,4 @@
-"""audelkg download commands — thin Click wrappers around scripts/download_ia.py."""
+"""iakg download commands — thin Click wrappers around scripts/download_ia.py."""
 
 import sys
 from pathlib import Path
@@ -11,13 +11,10 @@ if str(_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS))
 
 from download_ia import (  # noqa: E402
-    ALL_GENRES,
     cmd_catalog,
     cmd_download,
     cmd_search,
     cmd_survey,
-    download_book,
-    search_ia,
 )
 
 
@@ -32,42 +29,59 @@ def download() -> None:
 def search_cmd(query: tuple[str, ...], n: int) -> None:
     """Search Internet Archive for texts."""
     import argparse
+
     args = argparse.Namespace(query=list(query), n=n)
     sys.exit(cmd_search(args))
 
 
 @download.command("book")
 @click.argument("identifier")
-@click.option("--title",    default=None, help="Override book title")
-@click.option("--genre",    type=click.Choice(ALL_GENRES), default=None)
-@click.option("--force",    is_flag=True, help="Re-download if already exists")
-@click.option("--dry-run",  is_flag=True)
-def book_cmd(identifier: str, title: str | None, genre: str | None, force: bool, dry_run: bool) -> None:
+@click.option("--title", default=None, help="Override book title")
+@click.option("--genre", default=None, help="Genre subdirectory (e.g. audel-electric)")
+@click.option("--force", is_flag=True, help="Re-download if already exists")
+@click.option("--dry-run", is_flag=True)
+def book_cmd(
+    identifier: str, title: str | None, genre: str | None, force: bool, dry_run: bool
+) -> None:
     """Download a single Internet Archive item by identifier."""
     import argparse
+
     args = argparse.Namespace(
-        identifier=identifier, title=title, genre=genre,
-        force=force, dry_run=dry_run,
+        identifier=identifier,
+        title=title,
+        genre=genre,
+        force=force,
+        dry_run=dry_run,
     )
     sys.exit(cmd_download(args))
 
 
 @download.command("catalog")
 @click.argument("catalog_file", type=click.Path(exists=True))
-@click.option("--genre",   type=click.Choice(ALL_GENRES), default=None)
-@click.option("--force",   is_flag=True)
+@click.option(
+    "--genre", default=None, help="Genre subdirectory (inferred from filename if omitted)"
+)
+@click.option("--force", is_flag=True)
 @click.option("--dry-run", is_flag=True)
 def catalog_cmd(catalog_file: str, genre: str | None, force: bool, dry_run: bool) -> None:
-    """Download all items from a tab-separated catalog file."""
+    """Download all items from a tab-separated catalog file.
+
+    Genre is inferred from the catalog filename stem when --genre is not given
+    (e.g. catalogs/audel-electric.txt → genre audel-electric).
+    """
     import argparse
+
+    if genre is None:
+        genre = Path(catalog_file).stem
     args = argparse.Namespace(catalog=catalog_file, genre=genre, force=force, dry_run=dry_run)
     sys.exit(cmd_catalog(args))
 
 
 @download.command("survey")
-@click.option("--genre", type=click.Choice(ALL_GENRES), default=None)
+@click.option("--genre", default=None, help="Filter to one genre")
 def survey_cmd(genre: str | None) -> None:
     """Show download/ingest status for the corpus."""
     import argparse
+
     args = argparse.Namespace(genre=genre)
     sys.exit(cmd_survey(args))

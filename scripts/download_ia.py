@@ -44,7 +44,6 @@ scanned DjVu text layers — making it directly compatible with DocKG's
 
 import argparse
 import json
-import os
 import re
 import sys
 import time
@@ -59,14 +58,24 @@ from pathlib import Path
 # ---------------------------------------------------------------------------
 
 IA_METADATA_URL = "https://archive.org/metadata/{identifier}"
-IA_SEARCH_URL   = "https://archive.org/advancedsearch.php"
+IA_SEARCH_URL = "https://archive.org/advancedsearch.php"
 IA_DOWNLOAD_URL = "https://archive.org/download/{identifier}/{filename}"
-IA_DETAILS_URL  = "https://archive.org/details/{identifier}"
+IA_DETAILS_URL = "https://archive.org/details/{identifier}"
 
-REPO_ROOT   = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parent.parent
 CORPUS_ROOT = REPO_ROOT / "corpus"
 
-ALL_GENRES = ["audel-electric"]
+
+def _discover_genres() -> list[str]:
+    """Return genre names from corpus/ subdirectories."""
+    if not CORPUS_ROOT.exists():
+        return []
+    return sorted(
+        p.name for p in CORPUS_ROOT.iterdir() if p.is_dir() and not p.name.startswith(".")
+    )
+
+
+ALL_GENRES = _discover_genres()  # for CLI choices at import time
 
 # Unicode ligature normalization: OCR commonly mis-encodes these
 LIGATURES: dict[str, str] = {
@@ -87,24 +96,33 @@ LIGATURES: dict[str, str] = {
 
 HEADING_PATTERNS = [
     # CHAPTER I / CHAPTER 1 / CHAPTER XIV — optional subtitle after separator
-    (re.compile(
-        r"^CHAPTER\s+(?:[IVXLCDM]{1,7}|\d+)\.?"
-        r"(?:\s*[-—:.]?\s*(.+))?$",
-        re.IGNORECASE,
-    ), 2),
+    (
+        re.compile(
+            r"^CHAPTER\s+(?:[IVXLCDM]{1,7}|\d+)\.?"
+            r"(?:\s*[-—:.]?\s*(.+))?$",
+            re.IGNORECASE,
+        ),
+        2,
+    ),
     # PART ONE / PART I / PART 1 — optional subtitle
-    (re.compile(
-        r"^PART\s+(?:ONE|TWO|THREE|FOUR|FIVE|SIX|SEVEN|EIGHT|NINE|TEN|"
-        r"[IVXLCDM]{1,7}|\d+)\.?"
-        r"(?:\s*[-—:.]?\s*(.+))?$",
-        re.IGNORECASE,
-    ), 2),
+    (
+        re.compile(
+            r"^PART\s+(?:ONE|TWO|THREE|FOUR|FIVE|SIX|SEVEN|EIGHT|NINE|TEN|"
+            r"[IVXLCDM]{1,7}|\d+)\.?"
+            r"(?:\s*[-—:.]?\s*(.+))?$",
+            re.IGNORECASE,
+        ),
+        2,
+    ),
     # SECTION / DIVISION — numbered
-    (re.compile(
-        r"^(?:SECTION|DIVISION)\s+(?:[IVXLCDM]{1,7}|\d+)\.?"
-        r"(?:\s*[-—:.]?\s*(.+))?$",
-        re.IGNORECASE,
-    ), 2),
+    (
+        re.compile(
+            r"^(?:SECTION|DIVISION)\s+(?:[IVXLCDM]{1,7}|\d+)\.?"
+            r"(?:\s*[-—:.]?\s*(.+))?$",
+            re.IGNORECASE,
+        ),
+        2,
+    ),
     # Standalone ALL-CAPS heading: 3-60 chars, only uppercase letters/spaces/basic punct
     # e.g. "DIRECT CURRENTS", "OHM'S LAW AND ITS APPLICATIONS"
     (re.compile(r"^([A-Z][A-Z\s\-\',:]{2,59})$"), 3),
@@ -114,7 +132,7 @@ HEADING_PATTERNS = [
 
 # Indices into HEADING_PATTERNS for special handling
 _PAT_ALL_CAPS = 3
-_PAT_QUES     = 4
+_PAT_QUES = 4
 
 # Illustration / figure markers to strip
 FIGURE_RE = re.compile(
@@ -136,6 +154,7 @@ TOC_HEADING_RE = re.compile(
 # Utilities
 # ---------------------------------------------------------------------------
 
+
 def slugify(title: str) -> str:
     """Convert a title to a filesystem-friendly slug (underscores)."""
     slug = title.lower().strip()
@@ -150,14 +169,14 @@ def fetch_url(url: str, retries: int = 3, backoff: float = 2.0) -> str:
         try:
             req = urllib.request.Request(
                 url,
-                headers={"User-Agent": "AudelKG/1.0 (archive.org research)"},
+                headers={"User-Agent": "IAKG/1.0 (archive.org research)"},
             )
             with urllib.request.urlopen(req, timeout=60) as resp:
                 return resp.read().decode("utf-8-sig", errors="replace")
         except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError) as exc:
             if attempt == retries - 1:
                 raise
-            wait = backoff * (2 ** attempt)
+            wait = backoff * (2**attempt)
             print(f"  Retry {attempt + 1}/{retries} after error: {exc}  (waiting {wait:.0f}s)")
             time.sleep(wait)
     return ""
@@ -166,6 +185,7 @@ def fetch_url(url: str, retries: int = 3, backoff: float = 2.0) -> str:
 # ---------------------------------------------------------------------------
 # Internet Archive Metadata
 # ---------------------------------------------------------------------------
+
 
 def _coerce_str(value: object) -> str:
     """Return first element if list, else str; empty string if falsy."""
@@ -198,14 +218,14 @@ def fetch_ia_metadata(identifier: str) -> dict:
 
     meta: dict = {"identifier": identifier, "_files": files}
 
-    meta["title"]     = _coerce_str(ia.get("title", "")) or identifier
-    meta["author"]    = _coerce_str(ia.get("creator", ""))
+    meta["title"] = _coerce_str(ia.get("title", "")) or identifier
+    meta["author"] = _coerce_str(ia.get("creator", ""))
     meta["publisher"] = _coerce_str(ia.get("publisher", ""))
-    meta["volume"]    = _coerce_str(ia.get("volume") or ia.get("volumenumber", ""))
-    meta["series"]    = _coerce_str(ia.get("series", ""))
-    meta["edition"]   = _coerce_str(ia.get("edition", ""))
-    meta["language"]  = _coerce_str(ia.get("language", "eng")) or "eng"
-    meta["subjects"]  = _coerce_list(ia.get("subject", []))
+    meta["volume"] = _coerce_str(ia.get("volume") or ia.get("volumenumber", ""))
+    meta["series"] = _coerce_str(ia.get("series", ""))
+    meta["edition"] = _coerce_str(ia.get("edition", ""))
+    meta["language"] = _coerce_str(ia.get("language", "eng")) or "eng"
+    meta["subjects"] = _coerce_list(ia.get("subject", []))
 
     # Date: keep only the year
     raw_date = _coerce_str(ia.get("date", ""))
@@ -235,16 +255,14 @@ def find_text_file(identifier: str, files: list[dict]) -> tuple[str, str] | None
     Returns (filename, format_label) or None.
     """
     # DjVu text layer — cleanest OCR output from scanned books
-    djvu = [
-        f["name"] for f in files
-        if f.get("name", "").endswith("_djvu.txt")
-    ]
+    djvu = [f["name"] for f in files if f.get("name", "").endswith("_djvu.txt")]
     if djvu:
         return (min(djvu, key=len), "DjVu Text")
 
     # Fallback: any plain text file that isn't metadata/readme
     txt = [
-        f["name"] for f in files
+        f["name"]
+        for f in files
         if (
             f.get("name", "").endswith(".txt")
             and "readme" not in f.get("name", "").lower()
@@ -263,7 +281,7 @@ def fetch_text(identifier: str, files: list[dict]) -> str | None:
     result = find_text_file(identifier, files)
     if result is None:
         print(f"  [!] No text file found for {identifier!r}")
-        print(f"  [!] Available formats: {sorted({f.get('format','?') for f in files})}")
+        print(f"  [!] Available formats: {sorted({f.get('format', '?') for f in files})}")
         return None
 
     filename, fmt = result
@@ -280,14 +298,14 @@ def fetch_text(identifier: str, files: list[dict]) -> str | None:
 # OCR Cleaning
 # ---------------------------------------------------------------------------
 
+
 def _detect_running_headers(lines: list[str]) -> frozenset[str]:
     """Return the set of short lines that appear 4+ times — running headers/footers."""
     short = [ln.strip() for ln in lines if 3 < len(ln.strip()) < 80]
     counts = Counter(short)
     # Exclude obvious section headings (they may legitimately repeat at start)
     return frozenset(
-        line for line, n in counts.items()
-        if n >= 4 and not INDEX_HEADING_RE.match(line)
+        line for line, n in counts.items() if n >= 4 and not INDEX_HEADING_RE.match(line)
     )
 
 
@@ -307,12 +325,13 @@ def clean_ocr(text: str) -> str:
     # 1. Ligatures and smart quotes
     for ligature, replacement in LIGATURES.items():
         text = text.replace(ligature, replacement)
-    text = (text
-            .replace("\u2019", "'")   # right single quote
-            .replace("\u2018", "'")   # left single quote
-            .replace("\u201c", '"')   # left double quote
-            .replace("\u201d", '"')   # right double quote
-            .replace("\u00ad", ""))   # soft hyphen (remove entirely)
+    text = (
+        text.replace("\u2019", "'")  # right single quote
+        .replace("\u2018", "'")  # left single quote
+        .replace("\u201c", '"')  # left double quote
+        .replace("\u201d", '"')  # right double quote
+        .replace("\u00ad", "")
+    )  # soft hyphen (remove entirely)
 
     # 2. Join hyphenated line-breaks: "mag-\nnetism" -> "magnetism"
     text = re.sub(r"(\w)-\n(\w)", r"\1\2", text)
@@ -347,6 +366,7 @@ def clean_ocr(text: str) -> str:
 # ---------------------------------------------------------------------------
 # Text -> Markdown Conversion
 # ---------------------------------------------------------------------------
+
 
 def _is_heading(line: str) -> tuple[int, str] | None:
     """Check if a stripped line is a structural heading.
@@ -387,11 +407,10 @@ def _is_heading(line: str) -> tuple[int, str] | None:
     return None
 
 
-_STRUCTURAL_HEADING_RE = re.compile(
-    r"^(?:CHAPTER|PART|SECTION|DIVISION)\s+", re.IGNORECASE
-)
+_STRUCTURAL_HEADING_RE = re.compile(r"^(?:CHAPTER|PART|SECTION|DIVISION)\s+", re.IGNORECASE)
 # TOC entries end with dots + page number: "Chapter I — Topic....... 15"
 _TOC_ENTRY_RE = re.compile(r"[\.\s]{3,}\d+\s*$")
+
 
 def _find_toc_range(lines: list[str]) -> range:
     """Detect a table-of-contents block near the top and return its line range."""
@@ -408,8 +427,9 @@ def _find_toc_range(lines: list[str]) -> range:
                     blank_run = 0
                     # End TOC at a structural heading that is NOT itself a TOC entry.
                     # TOC entries contain trailing dots + page number ("Chapter I....... 15").
-                    if (_STRUCTURAL_HEADING_RE.match(stripped) and
-                            not _TOC_ENTRY_RE.search(stripped)):
+                    if _STRUCTURAL_HEADING_RE.match(stripped) and not _TOC_ENTRY_RE.search(
+                        stripped
+                    ):
                         return range(i, j)
             return range(i, min(i + 400, len(lines)))
     return range(0)
@@ -434,12 +454,12 @@ def text_to_markdown(text: str, meta: dict) -> str:
 
     # --- Front matter ---
     md: list[str] = []
-    title     = meta.get("title", "Untitled")
-    author    = meta.get("author", "")
+    title = meta.get("title", "Untitled")
+    author = meta.get("author", "")
     publisher = meta.get("publisher", "")
-    pub_date  = meta.get("date", "")
-    series    = meta.get("series", "")
-    volume    = meta.get("volume", "")
+    pub_date = meta.get("date", "")
+    series = meta.get("series", "")
+    volume = meta.get("volume", "")
 
     md.append(f"# {title}")
     md.append("")
@@ -533,6 +553,7 @@ def text_to_markdown(text: str, meta: dict) -> str:
 # Reference File Generation
 # ---------------------------------------------------------------------------
 
+
 def write_reference(book_dir: Path, meta: dict) -> Path:
     """Write a reference.md sidecar with Internet Archive metadata."""
     ref_path = book_dir / "reference.md"
@@ -548,10 +569,10 @@ def write_reference(book_dir: Path, meta: dict) -> Path:
         "",
     ]
 
-    author    = meta.get("author", "")
+    author = meta.get("author", "")
     publisher = meta.get("publisher", "")
-    pub_date  = meta.get("date", "")
-    edition   = meta.get("edition", "")
+    pub_date = meta.get("date", "")
+    edition = meta.get("edition", "")
 
     if author or publisher or pub_date:
         lines += ["## Publication", ""]
@@ -597,6 +618,7 @@ def write_reference(book_dir: Path, meta: dict) -> Path:
 # ---------------------------------------------------------------------------
 # Download Orchestration
 # ---------------------------------------------------------------------------
+
 
 def download_book(
     identifier: str,
@@ -659,6 +681,7 @@ def download_book(
 # Search
 # ---------------------------------------------------------------------------
 
+
 def search_ia(query: str, max_results: int = 25) -> list[dict]:
     """Search Internet Archive texts. Returns list of result dicts."""
     # Embed mediatype:texts in the query — IA no longer accepts it as a separate param.
@@ -683,13 +706,15 @@ def search_ia(query: str, max_results: int = 25) -> list[dict]:
         if isinstance(creator, list):
             creator = ", ".join(creator)
         date_str = str(doc.get("date", ""))
-        results.append({
-            "identifier": doc.get("identifier", ""),
-            "title":      doc.get("title", ""),
-            "author":     creator.strip(),
-            "date":       date_str[:4] if date_str else "",
-            "publisher":  _coerce_str(doc.get("publisher", "")),
-        })
+        results.append(
+            {
+                "identifier": doc.get("identifier", ""),
+                "title": doc.get("title", ""),
+                "author": creator.strip(),
+                "date": date_str[:4] if date_str else "",
+                "publisher": _coerce_str(doc.get("publisher", "")),
+            }
+        )
 
     return results
 
@@ -697,6 +722,7 @@ def search_ia(query: str, max_results: int = 25) -> list[dict]:
 # ---------------------------------------------------------------------------
 # Commands
 # ---------------------------------------------------------------------------
+
 
 def cmd_search(args: argparse.Namespace) -> int:
     query = " ".join(args.query)
@@ -737,6 +763,9 @@ def cmd_catalog(args: argparse.Namespace) -> int:
         print(f"ERROR: catalog not found: {catalog_path}", file=sys.stderr)
         return 1
 
+    # Infer genre from catalog filename stem when not given explicitly.
+    genre = args.genre or catalog_path.stem
+
     entries: list[tuple[str, str | None]] = []
     for line in catalog_path.read_text(encoding="utf-8").splitlines():
         line = line.strip()
@@ -759,7 +788,7 @@ def cmd_catalog(args: argparse.Namespace) -> int:
         result = download_book(
             identifier=identifier,
             title=title,
-            genre=args.genre,
+            genre=genre,
             force=args.force,
             dry_run=args.dry_run,
         )
@@ -775,7 +804,7 @@ def cmd_catalog(args: argparse.Namespace) -> int:
 
 
 def cmd_survey(args: argparse.Namespace) -> int:
-    genres = [args.genre] if args.genre else ALL_GENRES
+    genres = [args.genre] if args.genre else _discover_genres()
 
     total_md = total_ref = total_kg = 0
     for genre in genres:
@@ -785,24 +814,21 @@ def cmd_survey(args: argparse.Namespace) -> int:
             continue
 
         book_dirs = sorted(
-            p for p in genre_dir.iterdir()
-            if p.is_dir() and not p.name.startswith(".")
+            p for p in genre_dir.iterdir() if p.is_dir() and not p.name.startswith(".")
         )
         print(f"\n=== {genre} ({len(book_dirs)} books) ===")
         print(f"  {'Book':<50} {'MD':>3} {'REF':>4} {'KG':>4}")
         print(f"  {'-' * 62}")
         for bd in book_dirs:
-            has_md  = any(
-                f for f in bd.glob("*.md") if f.name != "reference.md"
-            )
+            has_md = any(f for f in bd.glob("*.md") if f.name != "reference.md")
             has_ref = (bd / "reference.md").exists()
-            has_kg  = (bd / ".dockg" / "graph.sqlite").exists()
-            md_m    = "✓" if has_md  else "-"
-            ref_m   = "✓" if has_ref else "-"
-            kg_m    = "✓" if has_kg  else "-"
-            total_md  += int(has_md)
+            has_kg = (bd / ".dockg" / "graph.sqlite").exists()
+            md_m = "✓" if has_md else "-"
+            ref_m = "✓" if has_ref else "-"
+            kg_m = "✓" if has_kg else "-"
+            total_md += int(has_md)
             total_ref += int(has_ref)
-            total_kg  += int(has_kg)
+            total_kg += int(has_kg)
             print(f"  {bd.name:<50} {md_m:>3} {ref_m:>4} {kg_m:>4}")
 
     print(f"\nTotals — md: {total_md}  ref: {total_ref}  kg: {total_kg}")
@@ -812,6 +838,7 @@ def cmd_survey(args: argparse.Namespace) -> int:
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
+
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
@@ -829,21 +856,23 @@ def build_parser() -> argparse.ArgumentParser:
     # download
     sp = sub.add_parser("download", help="Download a single IA item by identifier")
     sp.add_argument("identifier", help="Internet Archive identifier")
-    sp.add_argument("--title",   help="Override the book title (affects directory name)")
-    sp.add_argument("--genre",   choices=ALL_GENRES, help="Genre subdirectory")
-    sp.add_argument("--force",   action="store_true", help="Re-download if already exists")
+    sp.add_argument("--title", help="Override the book title (affects directory name)")
+    sp.add_argument("--genre", help="Genre subdirectory (e.g. audel-electric)")
+    sp.add_argument("--force", action="store_true", help="Re-download if already exists")
     sp.add_argument("--dry-run", action="store_true", help="Print actions without writing files")
 
     # catalog
     sp = sub.add_parser("catalog", help="Download all items from a catalog file")
     sp.add_argument("catalog", help="Path to catalog .txt file (tab-separated id [title])")
-    sp.add_argument("--genre",   choices=ALL_GENRES, help="Genre for all items")
-    sp.add_argument("--force",   action="store_true")
+    sp.add_argument(
+        "--genre", help="Genre subdirectory (inferred from catalog filename if omitted)"
+    )
+    sp.add_argument("--force", action="store_true")
     sp.add_argument("--dry-run", action="store_true")
 
     # survey
     sp = sub.add_parser("survey", help="Show download/ingest status for corpus")
-    sp.add_argument("--genre", choices=ALL_GENRES, help="Filter to one genre")
+    sp.add_argument("--genre", help="Filter to one genre")
 
     return p
 
@@ -851,10 +880,10 @@ def build_parser() -> argparse.ArgumentParser:
 def main() -> int:
     args = build_parser().parse_args()
     dispatch = {
-        "search":   cmd_search,
+        "search": cmd_search,
         "download": cmd_download,
-        "catalog":  cmd_catalog,
-        "survey":   cmd_survey,
+        "catalog": cmd_catalog,
+        "survey": cmd_survey,
     }
     return dispatch[args.command](args)
 

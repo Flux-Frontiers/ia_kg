@@ -1,44 +1,145 @@
+# pyproject.toml — ia-kg package configuration (PEP 621)
+#
+# Author: Eric G. Suchanek, PhD
+# Last Revision: 2026-05-03
+#
+# Build system : Poetry 2.x with PEP 621 [project] table
+#
+# Quick install (pip)
+# -------------------
+#   pip install -e ".[dev]"             core + dev tools (pytest, ruff, mypy, etc.)
+#   pip install -e ".[kgdeps]"          core + KG integrations (pycode-kg)
+#   pip install -e "."                  core runtime only
+#
+# Quick install (poetry)
+# ----------------------
+#   poetry install --extras "dev"       core + dev tools
+#   poetry install --extras "kgdeps"    core + KG integrations (pycode-kg)
+#   poetry install                      core runtime only
+#
+# First-time setup
+# ----------------
+#   python -m venv .venv
+#   source .venv/bin/activate       # Windows: .venv\Scripts\activate
+#   pip install -e ".[dev]"
+#
+# Run tests
+# ---------
+#   pytest                          uses [tool.pytest.ini_options] (testpaths = tests/)
+#   pytest -m "not slow"            skip slow tests
+#   pytest --cov=ia_kg              with coverage
+#
+# Download & ingest
+# -----------------
+#   iakg download catalog scripts/catalogs/audel-electric.txt
+#   iakg ingest --list-genres
+#   iakg ingest --genre audel-electric
+
 [build-system]
 requires = ["poetry-core>=2.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
-name = "audel-kg"
-version = "0.1.0"
-description = "CLI for downloading and ingesting Internet Archive technical manuals as knowledge graphs"
-authors = ["Eric G. Suchanek, PhD <suchanek@mac.com>"]
-license = "Elastic-2.0"
-homepage = "https://github.com/Flux-Frontiers/audel_kg"
-repository = "https://github.com/Flux-Frontiers/audel_kg"
-keywords = ["knowledge-graph", "internet-archive", "dockg", "kgrag", "nlp", "audel"]
-packages = [{ include = "audel_kg", from = "src" }]
+packages = [{ include = "ia_kg", from = "src" }]
 
+# kg-rag is not yet on PyPI — installed via git
 [tool.poetry.dependencies]
-python   = ">=3.12,<3.14"
-click    = ">=8.1.0"
-kg-rag   = { git = "https://github.com/Flux-Frontiers/KGRAG.git" }
-doc-kg   = { git = "https://github.com/Flux-Frontiers/doc_kg.git" }
-kgmodule-utils = "^0.2.0"
+kg-rag = { git = "https://github.com/Flux-Frontiers/KGRAG.git" }
 
+# ---------------------------------------------------------------------------
+# PEP 621 project metadata
+# ---------------------------------------------------------------------------
+[project]
+name = "ia-kg"
+version = "0.1.0"
+description = "CLI for downloading and ingesting Internet Archive books as knowledge graphs"
+readme = "README.md"
+license = "Elastic-2.0"
+authors = [
+    { name = "Eric G. Suchanek, PhD", email = "suchanek@mac.com" }
+]
+keywords = ["knowledge-graph", "internet-archive", "dockg", "kgrag", "nlp"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+requires-python = ">=3.12,<3.14"
+dependencies = [
+    "click>=8.1.0,<9",
+    "doc-kg>=0.12.3",
+    "kgmodule-utils>=0.2.0",
+]
 
-[tool.poetry.group.dev.dependencies]
-pytest = ">=8.0.0"
-ruff   = ">=0.4.0"
+[project.optional-dependencies]
+dev = [
+    "mypy>=1.10.0",
+    "pre-commit>=4.5.1",
+    "pytest>=8.0.0",
+    "pytest-cov>=5.0.0",
+    "ruff>=0.4.0",
+]
+kgdeps = [
+    "pycode-kg>=0.19.0",
+]
 
-[tool.poetry.scripts]
-audelkg = "audel_kg.cli.main:cli"
+[project.urls]
+Homepage   = "https://github.com/Flux-Frontiers/ia_kg"
+Repository = "https://github.com/Flux-Frontiers/ia_kg"
 
+[project.scripts]
+iakg = "ia_kg.cli.main:cli"
+
+# ---------------------------------------------------------------------------
+# Tool configuration
+# ---------------------------------------------------------------------------
 [tool.ruff]
 line-length    = 100
 target-version = "py312"
+exclude        = ["corpus/", ".claude/"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP"]
 ignore = ["E501"]
 
+[tool.mypy]
+python_version         = "3.12"
+strict                 = false
+ignore_missing_imports = true
+mypy_path              = "src"
+explicit_package_bases = true
+
+[tool.pytest.ini_options]
+testpaths  = ["tests"]
+addopts    = "-v --tb=short"
+pythonpath = ["src"]
+markers = [
+    "slow: marks tests as slow (deselect with '-m not slow')",
+    "integration: marks tests that require live network or external services",
+]
+
+[tool.pylint.messages_control]
+disable = ["all"]
+enable = [
+    "broad-exception-caught",   # W0718
+    "cell-var-from-loop",       # W0640
+    "cyclic-import",            # R0401
+    "import-outside-toplevel",  # C0415
+    "undefined-variable",       # E0602
+]
+
+# ---------------------------------------------------------------------------
+# PyCodeKG / DocKG index configuration
+# ---------------------------------------------------------------------------
+[tool.pycodekg]
+include = ["src"]
+
 [tool.dockg]
 exclude = [
-    ".dockg", ".codekg", ".git", ".venv", "venv",
-    "__pycache__", ".mypy_cache", ".pytest_cache", "dist", "reports",
-    "src",
+    ".dockg", ".pycodekg", ".git", ".mypy_cache", ".pytest_cache", ".venv",
+    "__pycache__", "corpus", "dist", "src", "venv",
 ]
