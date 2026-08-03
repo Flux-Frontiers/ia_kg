@@ -8,26 +8,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- `iakg download search --export-catalog FILE`: new flag writes all search results to a commented-out draft catalog `.txt` file. Every line is prefixed with `#` so nothing downloads accidentally; uncomment desired entries before running `iakg download catalog`.
-- `docs/catalog-workflow.md`: step-by-step guide covering search → export-catalog → curate → test one book → bulk download → survey → ingest.
 
 ### Changed
-
-- **Dependency floors lifted to the currently published releases** —
-  `kgmodule-utils>=0.8.0` (from a long-dead `>=0.2.0`), `doc-kg>=0.18.1` (from
-  `>=0.12.3`), `pycode-kg>=0.20.0`; lock regenerated. kgmodule-utils 0.8.0
-  defaults `vector_backend` to `"auto"`: sqlite-vec for fresh or
-  already-migrated stores, LanceDB only when an un-migrated store already
-  exists on disk, so existing corpora keep working untouched.
 
 ### Removed
 
 ### Fixed
-- `.github/workflows/ci.yml`: replaced invalid `poetry install --only dev` with `poetry install --extras dev` in both `lint` and `test` jobs. `--only` targets Poetry dependency *groups*; `dev` is a PEP 621 *extra*, so the old command errored in CI.
 
-## [0.1.0] - 2026-05-03
+## [0.1.0] - 2026-08-03
+
+First published release. The `[0.1.0]` work was originally dated 2026-05-03 but
+was never tagged or published, so everything developed since has been folded in
+here rather than shipped as a phantom second version.
 
 ### Added
+- `iakg download search --export-catalog FILE`: new flag writes all search results to a commented-out draft catalog `.txt` file. Every line is prefixed with `#` so nothing downloads accidentally; uncomment desired entries before running `iakg download catalog`.
+- `docs/catalog-workflow.md`: step-by-step guide covering search → export-catalog → curate → test one book → bulk download → survey → ingest.
+- `.github/workflows/release.yml`: tag-triggered release workflow mirroring the fleet standard (doc-kg, pycode-kg) — fires on `push: tags: ['v*']`, runs `poetry build`, and creates a GitHub Release from `dist/*`. It does **not** publish to PyPI; that stays a manual `poetry publish --build` step.
+- `release-notes.md`: prose release notes, read by the workflow above via `--notes-file` out of the tagged commit. Rewritten at each release rather than appended to.
 - `src/ia_kg/`: New package replacing `src/audel_kg/` — renamed to `ia_kg` with entry point `iakg` to reflect the project's general Internet Archive scope rather than Audel-specific use.
 - `src/ia_kg/cli/main.py`, `cmd_download.py`, `cmd_ingest.py`, `options.py`: Click-based CLI with `download` (book / catalog / search / survey) and `ingest` subcommands. Genre is inferred from the catalog filename stem when `--genre` is omitted.
 - `tests/test_download_ia.py`, `tests/conftest.py`: 9-test pytest suite covering `slugify`, ligature normalization, smart-quote cleaning, hyphen-join, page-number removal, index stripping, running-header removal, heading detection, and Markdown conversion.
@@ -37,6 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `.claude/skills/`: Copied `dockg`, `documentation-lookup`, `kgrag`, `kgrag-usage`, `new-kg-module`, `publish`, `pycodekg`, `pycodekg-thorough-analysis`, and `skill-creator` skills from pycode_kg.
 
 ### Changed
+- **Dependency floors lifted to the currently published releases** — `kgmodule-utils>=0.10.0` (from a long-dead `>=0.2.0`), `doc-kg>=0.21.0` (from `>=0.12.3`), `pycode-kg>=0.21.4`; lock regenerated. Note the behavioural consequence of the doc-kg floor: from 0.20.0 `vector_backend` defaults to `"sqlite-vec"` outright rather than resolving per-store from whatever is on disk, and `lancedb` is no longer a core dependency — it moved to an opt-in `[lancedb]` extra needed only to read a pre-0.20.0 store via `dockg convert-index`.
 - `scripts/download_ia.py`: Replaced hardcoded `ALL_GENRES = ["audel-electric"]` with `_discover_genres()` — scans `corpus/` subdirectories at runtime. `--genre` arguments changed from `choices=ALL_GENRES` to free-form strings. Genre auto-inferred from catalog filename stem in `cmd_catalog`. User-Agent updated to `IAKG/1.0`.
 - `scripts/ingest.py`: Same dynamic genre discovery as `download_ia.py`. Removed genre validation against a hardcoded list. Summary header updated from "Audel KG" to "IA KG".
 - `pyproject.toml`: Migrated from `[tool.poetry]` metadata to PEP 621 `[project]` table. Added `classifiers`, `[project.urls]`, `[project.optional-dependencies]` (`dev`, `kgdeps`). Moved `doc-kg` from git source to PyPI (`>=0.12.3`). Added `[tool.mypy]`, `[tool.pylint.messages_control]`, `[tool.pycodekg]`. Expanded `[tool.pytest.ini_options]` with `pythonpath`, `-v`, and markers. Added `ruff` excludes for `corpus/` and `.claude/`.
@@ -44,3 +43,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 - `src/audel_kg/`: Deleted old package (replaced by `src/ia_kg/`).
+
+### Fixed
+- `.github/workflows/ci.yml`: replaced invalid `poetry install --only dev` with `poetry install --extras dev` in both `lint` and `test` jobs. `--only` targets Poetry dependency *groups*; `dev` is a PEP 621 *extra*, so the old command errored in CI.

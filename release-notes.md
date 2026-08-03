@@ -1,6 +1,6 @@
 # Release Notes — v0.1.0
 
-> Released: 2026-05-03
+> Released: 2026-08-03
 
 **IAKG is the Audel toolchain generalised.** What began as a set of scripts for
 one specific collection is now a package with a scope that matches what it
@@ -30,13 +30,33 @@ stripping, running-header removal, heading detection, and the final Markdown
 conversion. These are the transformations that make OCR output usable, and they
 were previously unverified.
 
+**Curating a catalog before you download it.** `iakg download search
+--export-catalog FILE` writes every search result to a draft catalog with each
+line commented out, so nothing downloads by accident. You uncomment the entries
+you actually want and feed the file to `iakg download catalog` — which turns an
+all-or-nothing search into a reviewable list. `docs/catalog-workflow.md` walks
+the whole path: search, export, curate, test a single book, bulk download,
+survey, ingest.
+
+**Dependency floors now point at software that exists.** `kgmodule-utils` was
+pinned at `>=0.2.0` and `doc-kg` at `>=0.12.3`, both long dead; they are now
+`>=0.10.0` and `>=0.21.0`, with `pycode-kg>=0.21.4`. One behavioural consequence
+worth knowing: from doc-kg 0.20.0 the vector backend defaults to `"sqlite-vec"`
+outright instead of being inferred per-store from whatever happens to be on
+disk, and `lancedb` is no longer a core dependency — it moved to an opt-in
+extra needed only to read a pre-0.20.0 store.
+
 **Repository hygiene brought in line with the rest of the fleet.** Pre-commit
 hooks (whitespace, EOF, YAML/TOML validation, merge-conflict and large-file
 guards, `ruff` lint and format), a GitHub Actions CI workflow with separate lint
 and test jobs, a README following the doc_kg conventions, and a `.gitignore` that
 actually excludes the KG artifacts (`.pycodekg/`, `.dockg/`) and wires up the
 shared KGRAG model cache. Packaging moved from `[tool.poetry]` metadata to the
-PEP 621 `[project]` table, and `doc-kg` moved from a git source to PyPI.
+PEP 621 `[project]` table, and `doc-kg` moved from a git source to PyPI. The CI
+lint and test jobs were also using `poetry install --only dev`, which targets
+dependency *groups* — `dev` here is a PEP 621 *extra*, so both jobs were
+erroring; they now use `--extras dev`. A tag-triggered release workflow rounds
+this out.
 
 ## Upgrading
 
