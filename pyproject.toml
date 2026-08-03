@@ -42,16 +42,12 @@ build-backend = "poetry.core.masonry.api"
 [tool.poetry]
 packages = [{ include = "ia_kg", from = "src" }]
 
-# kg-rag is not yet on PyPI — installed via git
-[tool.poetry.dependencies]
-kg-rag = { git = "https://github.com/Flux-Frontiers/KGRAG.git" }
-
 # ---------------------------------------------------------------------------
 # PEP 621 project metadata
 # ---------------------------------------------------------------------------
 [project]
 name = "ia-kg"
-version = "0.1.0"
+version = "0.1.1"
 description = "CLI for downloading and ingesting Internet Archive books as knowledge graphs"
 readme = "README.md"
 license = "Elastic-2.0"
@@ -72,6 +68,15 @@ requires-python = ">=3.12,<3.14"
 dependencies = [
     "click>=8.1.0,<9",
     "doc-kg>=0.21.0",
+    # `iakg ingest` registers each per-book DocKG in the KGRAG registry and adds
+    # it to genre corpora, so it imports KGRegistry/CorpusRegistry/KGEntry from
+    # kg_rag. Those primitives live only in kg-rag — kgmodule-utils covers
+    # embedding, extraction, storage and retrieval, not the cross-KG registry —
+    # so this is a real runtime dependency, not an optional integration. It was
+    # previously declared as a poetry git source, which PyPI strips from wheel
+    # metadata: `pip install ia-kg` got no kg-rag at all and `iakg ingest` died
+    # with ModuleNotFoundError. kg-rag has been on PyPI since 0.6.0.
+    "kg-rag>=0.11.0",
     "kgmodule-utils>=0.10.0",
 ]
 

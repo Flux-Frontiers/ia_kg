@@ -1,13 +1,8 @@
-"""iakg ingest command — thin Click wrapper around scripts/ingest.py."""
+"""iakg ingest command — thin Click wrapper around ia_kg.ingest."""
 
 import sys
-from pathlib import Path
 
 import click
-
-_SCRIPTS = Path(__file__).resolve().parent.parent.parent.parent / "scripts"
-if str(_SCRIPTS) not in sys.path:
-    sys.path.insert(0, str(_SCRIPTS))
 
 
 @click.command("ingest")
@@ -49,10 +44,14 @@ def ingest(
     if registry:
         argv += ["--registry", registry]
 
+    # Deferred: ia_kg.ingest pulls in kg_rag and the torch/transformers stack
+    # behind it, which `iakg --help` and the whole `download` group have no need
+    # of. kg-rag is a declared dependency, so this cannot fail on a normal
+    # install.
     old_argv = sys.argv
     sys.argv = argv
     try:
-        from ingest import main
+        from ..ingest import main
 
         sys.exit(main())
     finally:

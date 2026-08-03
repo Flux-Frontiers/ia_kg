@@ -1,78 +1,68 @@
-# Release Notes — v0.1.0
+# Release Notes — v0.1.1
 
 > Released: 2026-08-03
 
-**IAKG is the Audel toolchain generalised.** What began as a set of scripts for
-one specific collection is now a package with a scope that matches what it
-actually does: download books from the Internet Archive, clean the OCR text into
-Markdown, and ingest the result into a DocKG knowledge graph. The package is
-`ia_kg`, the command is `iakg`, and nothing about it assumes a particular
-collection any more.
+**0.1.0 was not installable — install this instead.** `pip install ia-kg==0.1.0`
+produced a package whose `iakg` command crashed on import, so every subcommand
+was dead on arrival. Two independent packaging defects caused it, neither of
+which is visible from a source checkout, which is why the tests and CI were green
+throughout. Both are fixed, and CI now installs the built wheel and runs the real
+command so this cannot recur.
 
 ## What changed
 
-**The Audel assumption is gone, in the name and in the code.** `src/audel_kg/`
-became `src/ia_kg/`, and the hardcoded `ALL_GENRES = ["audel-electric"]` that sat
-at the top of both `download_ia.py` and `ingest.py` was replaced with
-`_discover_genres()`, which scans the `corpus/` subdirectories at runtime.
-`--genre` accepts free-form strings rather than a fixed choice list, and is
-inferred from the catalog filename stem when omitted — so adding a genre means
-creating a directory, not editing source.
+**The CLI's implementation was not in the package.** All 1,588 lines of it —
+`download_ia.py` and `ingest.py` — lived in `scripts/`, which the wheel does not
+ship. `cli/cmd_download.py` bridged the gap by walking four directories up from
+its own `__file__` and injecting the result into `sys.path`. From a clone that
+lands on the repo root and everything works; from `site-packages` it lands on
+nothing. And because `cli/main.py` imports `cmd_download` at module scope, the
+failure took out every command, not just `download`. Both modules now live in
+`src/ia_kg/` and are imported normally, matching how gutenberg_kg is laid out:
+everything the CLI needs is in the package, and `scripts/` holds only dev
+one-offs.
 
-**A real CLI.** The scripts are now a Click application with two subcommands:
-`download`, covering single books, catalogs, search, and survey; and `ingest`,
-which builds the knowledge graph. Both are reachable as `iakg <subcommand>`.
+**`iakg ingest` had a dependency that was never installed.** `kg-rag` was
+declared as a poetry git source, and PyPI strips direct URLs from wheel metadata
+— so `pip install ia-kg` resolved no kg-rag at all and `ingest` died on
+`ModuleNotFoundError: No module named 'kg_rag'`. It is a genuine runtime
+dependency: ingest registers each per-book DocKG in the KGRAG registry and adds
+it to genre corpora, and those primitives (`KGRegistry`, `CorpusRegistry`,
+`KGEntry`) exist only in kg-rag — kgmodule-utils covers embedding, extraction,
+storage and retrieval, not the cross-KG registry. It is now declared as
+`kg-rag>=0.11.0`, which has been on PyPI since 0.6.0.
 
-**The text pipeline is under test.** Nine tests cover the parts most likely to
-silently corrupt a corpus: slug generation, ligature normalisation, smart-quote
-cleaning, hyphen-joining across line breaks, page-number removal, index
-stripping, running-header removal, heading detection, and the final Markdown
-conversion. These are the transformations that make OCR output usable, and they
-were previously unverified.
+**The corpus root no longer depends on where the code is installed.**
+`REPO_ROOT` and `CORPUS_ROOT` were each derived from `__file__` in three separate
+files. They are now defined once in `cli/options.py` and resolved from the
+working directory, with an `IAKG_ROOT` environment override. Deriving them from
+`__file__` is fine for a tool you only ever run from a clone; for a published
+package it points into `site-packages`, nowhere near your corpus.
 
-**Curating a catalog before you download it.** `iakg download search
---export-catalog FILE` writes every search result to a draft catalog with each
-line commented out, so nothing downloads by accident. You uncomment the entries
-you actually want and feed the file to `iakg download catalog` — which turns an
-all-or-nothing search into a reviewable list. `docs/catalog-workflow.md` walks
-the whole path: search, export, curate, test a single book, bulk download,
-survey, ingest.
-
-**Dependency floors now point at software that exists.** `kgmodule-utils` was
-pinned at `>=0.2.0` and `doc-kg` at `>=0.12.3`, both long dead; they are now
-`>=0.10.0` and `>=0.21.0`, with `pycode-kg>=0.21.4`. One behavioural consequence
-worth knowing: from doc-kg 0.20.0 the vector backend defaults to `"sqlite-vec"`
-outright instead of being inferred per-store from whatever happens to be on
-disk, and `lancedb` is no longer a core dependency — it moved to an opt-in
-extra needed only to read a pre-0.20.0 store.
-
-**Repository hygiene brought in line with the rest of the fleet.** Pre-commit
-hooks (whitespace, EOF, YAML/TOML validation, merge-conflict and large-file
-guards, `ruff` lint and format), a GitHub Actions CI workflow with separate lint
-and test jobs, a README following the doc_kg conventions, and a `.gitignore` that
-actually excludes the KG artifacts (`.pycodekg/`, `.dockg/`) and wires up the
-shared KGRAG model cache. Packaging moved from `[tool.poetry]` metadata to the
-PEP 621 `[project]` table, and `doc-kg` moved from a git source to PyPI. The CI
-lint and test jobs were also using `poetry install --only dev`, which targets
-dependency *groups* — `dev` here is a PEP 621 *extra*, so both jobs were
-erroring; they now use `--extras dev`. A tag-triggered release workflow rounds
-this out.
+**CI now tests the artifact, not just the source tree.** The unit tests import
+`ia_kg` via `pythonpath = ["src"]`, so they passed happily against a wheel
+missing half its modules. A new job builds the wheel, installs it into a clean
+virtualenv with no source tree in sight, and runs the console script from
+`/tmp` — every subcommand's `--help`, plus `iakg ingest --list-genres` and `iakg
+download survey`, which execute real code. That last part matters: Click resolves
+`--help` before the command body runs, so a subcommand with deferred imports can
+pass `--help` and still fail the moment it is actually invoked. That is precisely
+how the kg_rag defect stayed hidden.
 
 ## Upgrading
 
-This is the first release under the new name, so for most people it is an
-install rather than an upgrade:
-
 ```bash
-pip install ia-kg
+pip install --upgrade ia-kg
 iakg --help
 ```
 
-If you were running the old `audel_kg` package, two things change. The import
-path is `ia_kg`, not `audel_kg` — the old package is deleted, not aliased. And
-the genre list is no longer compiled in: `corpus/` is the source of truth, so any
-genre you want available needs a directory there. Existing `corpus/` layouts are
-discovered as-is and need no migration.
+If you installed 0.1.0, nothing you did was wrong — the package was broken.
+Upgrading is the whole fix; there is no migration and no data to convert.
+
+One behavioural note if you scripted around the old layout: the corpus is now
+located relative to your working directory rather than to the installed code.
+Run `iakg` from your corpus repo, or set `IAKG_ROOT=/path/to/repo` to point it
+elsewhere. `iakg ingest --list-genres` will tell you what it can see.
 
 ---
 

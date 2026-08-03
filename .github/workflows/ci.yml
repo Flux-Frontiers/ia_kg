@@ -68,3 +68,51 @@ jobs:
 
       - name: Run tests
         run: poetry run pytest
+
+  wheel:
+    name: Installed CLI
+    runs-on: ubuntu-latest
+    # The unit tests import ia_kg from the source tree via pythonpath = ["src"],
+    # so they pass even when the built wheel is missing modules the CLI imports.
+    # That is exactly how 0.1.0 shipped with a `iakg` entry point that died at
+    # import. Build the wheel, install it somewhere with no source tree in sight,
+    # and actually run the console script.
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+
+      - name: Build wheel
+        run: poetry build
+
+      - name: Install the wheel into a clean venv
+        run: |
+          python -m venv /tmp/smoke
+          /tmp/smoke/bin/pip install --quiet dist/*.whl
+
+      - name: Run the console script from outside the repo
+        run: |
+          cd /tmp
+          /tmp/smoke/bin/iakg --help
+          for cmd in "download" "download search" "download book" \
+                     "download catalog" "download survey" "ingest"; do
+            echo "--- iakg $cmd --help"
+            /tmp/smoke/bin/iakg $cmd --help > /dev/null
+          done
+
+      - name: Execute commands, not just --help
+        # --help alone is not enough. Click resolves --help before the command
+        # body runs, so a subcommand whose imports are deferred will pass --help
+        # and still fail the moment it is actually invoked — which is precisely
+        # how 0.1.1 nearly shipped with `iakg ingest` broken on a missing kg_rag.
+        # These two run real code paths and need no corpus, network or config.
+        run: |
+          cd /tmp
+          /tmp/smoke/bin/iakg ingest --list-genres
+          /tmp/smoke/bin/iakg download survey

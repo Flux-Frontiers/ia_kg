@@ -9,27 +9,27 @@ Commands:
 
 Usage:
     # Search for Audel manuals
-    python scripts/download_ia.py search "audel electric"
-    python scripts/download_ia.py search "audels electricians plumbers guide"
+    iakg download search "audel electric"
+    iakg download search "audels electricians plumbers guide"
 
     # Download a single item by IA identifier
-    python scripts/download_ia.py download audelselectriciansguide01ande --genre audel-electric
+    iakg download book audelselectriciansguide01ande --genre audel-electric
 
     # Download with explicit title override
-    python scripts/download_ia.py download someidentifier --title "My Title" --genre audel-electric
+    iakg download book someidentifier --title "My Title" --genre audel-electric
 
     # Download multiple books from a catalog file
-    python scripts/download_ia.py catalog scripts/catalogs/audel-electric.txt --genre audel-electric
+    iakg download catalog scripts/catalogs/audel-electric.txt --genre audel-electric
 
     # Survey what has been downloaded and ingested
-    python scripts/download_ia.py survey
-    python scripts/download_ia.py survey --genre audel-electric
+    iakg download survey
+    iakg download survey --genre audel-electric
 
     # Dry run (print actions without writing)
-    python scripts/download_ia.py download someidentifier --genre audel-electric --dry-run
+    iakg download book someidentifier --genre audel-electric --dry-run
 
     # Force re-download even if already present
-    python scripts/download_ia.py download someidentifier --genre audel-electric --force
+    iakg download book someidentifier --genre audel-electric --force
 
 Output structure (per book):
     corpus/<genre>/<Title>/
@@ -53,6 +53,8 @@ import urllib.request
 from collections import Counter
 from pathlib import Path
 
+from ia_kg.cli.options import CORPUS_ROOT, discover_genres
+
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
@@ -62,20 +64,7 @@ IA_SEARCH_URL = "https://archive.org/advancedsearch.php"
 IA_DOWNLOAD_URL = "https://archive.org/download/{identifier}/{filename}"
 IA_DETAILS_URL = "https://archive.org/details/{identifier}"
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
-CORPUS_ROOT = REPO_ROOT / "corpus"
-
-
-def _discover_genres() -> list[str]:
-    """Return genre names from corpus/ subdirectories."""
-    if not CORPUS_ROOT.exists():
-        return []
-    return sorted(
-        p.name for p in CORPUS_ROOT.iterdir() if p.is_dir() and not p.name.startswith(".")
-    )
-
-
-ALL_GENRES = _discover_genres()  # for CLI choices at import time
+ALL_GENRES = discover_genres()  # for CLI choices at import time
 
 # Unicode ligature normalization: OCR commonly mis-encodes these
 LIGATURES: dict[str, str] = {
@@ -821,7 +810,7 @@ def cmd_catalog(args: argparse.Namespace) -> int:
 
 
 def cmd_survey(args: argparse.Namespace) -> int:
-    genres = [args.genre] if args.genre else _discover_genres()
+    genres = [args.genre] if args.genre else discover_genres()
 
     total_md = total_ref = total_kg = 0
     for genre in genres:

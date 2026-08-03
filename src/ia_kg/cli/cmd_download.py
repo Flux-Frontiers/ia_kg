@@ -1,16 +1,11 @@
-"""iakg download commands — thin Click wrappers around scripts/download_ia.py."""
+"""iakg download commands — thin Click wrappers around ia_kg.download_ia."""
 
 import sys
 from pathlib import Path
 
 import click
 
-# Resolve the scripts directory so we can import without installing
-_SCRIPTS = Path(__file__).resolve().parent.parent.parent.parent / "scripts"
-if str(_SCRIPTS) not in sys.path:
-    sys.path.insert(0, str(_SCRIPTS))
-
-from download_ia import (  # noqa: E402
+from ..download_ia import (
     cmd_catalog,
     cmd_download,
     cmd_search,

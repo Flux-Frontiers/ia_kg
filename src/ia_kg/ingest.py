@@ -4,7 +4,7 @@ ingest.py — Build per-book DocKGs for every book in ia_kg, register
 them in the KGRAG registry, and add them to genre corpora and ia-all.
 
 Usage:
-    python scripts/ingest.py [OPTIONS]
+    iakg ingest [OPTIONS]
 
 Options:
     --genre GENRE        Process only this genre (repeatable; default: all)
@@ -15,11 +15,11 @@ Options:
     --registry PATH      Override the registry database path
 
 Examples:
-    python scripts/ingest.py
-    python scripts/ingest.py --genre audel-electric
-    python scripts/ingest.py --force-build --genre audel-electric
-    python scripts/ingest.py --push
-    python scripts/ingest.py --dry-run
+    iakg ingest
+    iakg ingest --genre audel-electric
+    iakg ingest --force-build --genre audel-electric
+    iakg ingest --push
+    iakg ingest --dry-run
 """
 
 from __future__ import annotations
@@ -40,24 +40,13 @@ from kg_rag.corpus_registry import CorpusRegistry
 from kg_rag.primitives import CorpusEntry, KGEntry, KGKind
 from kg_rag.registry import KGRegistry, default_registry_path
 
+from ia_kg.cli.options import CORPUS_ROOT, REPO_ROOT, discover_genres
+
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
-CORPUS_ROOT = REPO_ROOT / "corpus"
-
-
-def _discover_genres() -> list[str]:
-    """Return genre names from corpus/ subdirectories."""
-    if not CORPUS_ROOT.exists():
-        return []
-    return sorted(
-        p.name for p in CORPUS_ROOT.iterdir() if p.is_dir() and not p.name.startswith(".")
-    )
-
-
-ALL_GENRES = _discover_genres()  # evaluated at import time for --list-genres
+ALL_GENRES = discover_genres()  # evaluated at import time for --list-genres
 
 TOP_CORPUS = "ia-all"
 CORPUS_PREFIX = "ia"  # KG names: ia-<genre>-<slug>-doc
@@ -584,7 +573,7 @@ def main() -> int:
     args = parse_args()
 
     if args.list_genres:
-        genres = _discover_genres()
+        genres = discover_genres()
         if genres:
             print("Genres in corpus/:")
             for g in genres:
@@ -593,7 +582,7 @@ def main() -> int:
             print("No genres found (corpus/ is empty or missing).")
         return 0
 
-    genres = args.genres or _discover_genres()
+    genres = args.genres or discover_genres()
     registry_path = Path(args.registry).resolve() if args.registry else default_registry_path()
 
     opts = IngestOptions(

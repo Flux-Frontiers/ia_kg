@@ -1,8 +1,8 @@
-"""Pytest suite for scripts/download_ia.py text-processing functions."""
+"""Pytest suite for ia_kg.download_ia text-processing functions."""
 
 import textwrap
 
-from download_ia import _is_heading, clean_ocr, slugify, text_to_markdown
+from ia_kg.download_ia import _is_heading, clean_ocr, slugify, text_to_markdown
 
 
 def test_slugify() -> None:

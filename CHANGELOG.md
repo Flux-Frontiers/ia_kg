@@ -15,6 +15,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.1.1] - 2026-08-03
+
+**0.1.0 was not installable.** `iakg` crashed on import from a `pip install`, so
+every command was dead. Two independent packaging defects, both invisible from a
+source checkout, both fixed here.
+
+### Fixed
+- **`iakg` crashed with `ModuleNotFoundError: No module named 'download_ia'`.**
+  The CLI's entire implementation — 1,588 lines across `download_ia.py` and
+  `ingest.py` — lived in `scripts/`, which is not part of the package, and
+  `cli/cmd_download.py` reached it by walking four directories up from `__file__`
+  and injecting the result into `sys.path`. From a checkout that lands on the
+  repo root; from `site-packages` it lands on nothing. Because `cli/main.py`
+  imports `cmd_download` at module scope, *every* subcommand died, not just
+  `download`.
+- **`iakg ingest` failed with `ModuleNotFoundError: No module named 'kg_rag'`.**
+  `kg-rag` was declared as a poetry git source, which PyPI strips from wheel
+  metadata, so `pip install ia-kg` never installed it. It is now a normal
+  `kg-rag>=0.11.0` dependency — kg-rag has been on PyPI since 0.6.0 and the
+  comment claiming otherwise was stale.
+
+### Changed
+- **`download_ia.py` and `ingest.py` moved from `scripts/` into `src/ia_kg/`**,
+  matching gutenberg_kg, where every module the CLI imports lives in the package
+  and `scripts/` holds only dev one-offs. The `sys.path` manipulation in
+  `cmd_download.py` and `cmd_ingest.py` is gone; both now use ordinary relative
+  imports.
+- **`REPO_ROOT` / `CORPUS_ROOT` / `discover_genres()` are defined once**, in
+  `cli/options.py`, and imported by `download_ia` and `ingest` instead of each
+  file deriving its own copy — again mirroring `gutenberg_kg.cli.options`.
+- **The corpus root resolves from the working directory**, with an `IAKG_ROOT`
+  override, rather than from `__file__`. Sibling tools can use
+  `Path(__file__).parents[3]` because they are only ever run from a clone; ia-kg
+  is on PyPI, where that expression points into `site-packages` and the corpus is
+  nowhere near the installed code.
+- Usage examples in both module docstrings now show real `iakg` commands
+  (`iakg download book …`) instead of `python scripts/download_ia.py …`.
+
+### Added
+- **CI job that installs the built wheel into a clean venv and runs the console
+  script.** The unit tests import from the source tree via `pythonpath = ["src"]`,
+  so they passed on a wheel that was missing half its modules — nothing in CI
+  ever exercised the artifact users receive. The job runs `--help` for every
+  subcommand *and* executes `iakg ingest --list-genres` and `iakg download
+  survey`: Click resolves `--help` before the command body, so a deferred import
+  can pass `--help` and still fail when invoked, which is exactly how the kg_rag
+  defect hid.
+
+### Removed
+- `scripts/test_download_ia.py`: standalone predecessor of
+  `tests/test_download_ia.py`, superseded and orphaned by the module move.
+
 ## [0.1.0] - 2026-08-03
 
 First published release. The `[0.1.0]` work was originally dated 2026-05-03 but
