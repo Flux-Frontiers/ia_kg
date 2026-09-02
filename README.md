@@ -1,3 +1,41 @@
+> # ⚠️ Deprecated — superseded by `gutenberg_kg`
+>
+> **This project is no longer maintained.** Everything it did now lives in
+> [gutenberg_kg](https://github.com/Flux-Frontiers/gutenberg_kg) under the
+> `gutenkg ia` subcommands, which are a strict superset.
+>
+> | instead of | use |
+> |---|---|
+> | `iakg download search "<q>"` | `gutenkg ia search "<q>"` |
+> | `iakg download book <id> --genre <g>` | `gutenkg ia download <id> --genre <g>` |
+> | `iakg download catalog <file>` | `gutenkg ia catalog <file>` |
+> | `iakg download survey --genre <g>` | `gutenkg ia survey --genre <g>` |
+> | `iakg ingest --genre <g>` | `gutenkg ingest --genre <g>` |
+>
+> **Why.** The two projects had drifted into the same shape: the OCR and
+> Markdown code is byte-identical between `ia_kg/download_ia.py` and
+> `gutenberg_kg/ia.py` (`clean_ocr`, `_is_heading`, `text_to_markdown`,
+> `_detect_running_headers`, `_find_toc_range`), and both parse the same IA
+> items to the same bytes. Maintaining two copies bought nothing and cost
+> correctness: `gutenberg_kg` has since gained fixes this repo never got --
+> most importantly, downloads keyed on the **IA identifier** rather than the
+> output path, so a changed `--title` no longer writes a second directory
+> holding the same item.
+>
+> **What moved.** The Audels Electric Library corpus was consolidated into
+> `gutenberg_kg` (8 of 10 volumes, all the 1929 public-domain edition), and
+> `docs/catalog-workflow.md` was ported to
+> [`docs/IA_CATALOG_WORKFLOW.md`](https://github.com/Flux-Frontiers/gutenberg_kg/blob/main/docs/IA_CATALOG_WORKFLOW.md)
+> there, expanded with a rights-checking step this version lacked. The two CLI
+> features `gutenberg_kg` was missing -- `--export-catalog` and genre inference
+> from a catalog's filename -- were ported before retirement rather than lost.
+>
+> **If you installed `ia-kg` from PyPI:** it still works, but will receive no
+> further releases. Switch to `gutenberg-kg`.
+>
+> The code below is left as-is for reference. Its corpus is redundant with
+> `gutenberg_kg`'s and should not be rebuilt from here.
+
 [![CI](https://github.com/Flux-Frontiers/ia_kg/actions/workflows/ci.yml/badge.svg)](https://github.com/Flux-Frontiers/ia_kg/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.12%20%7C%203.13-blue.svg)](https://www.python.org/)
 [![License: Elastic-2.0](https://img.shields.io/badge/License-Elastic%202.0-blue.svg)](https://www.elastic.co/licensing/elastic-license)
