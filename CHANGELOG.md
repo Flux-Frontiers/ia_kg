@@ -7,13 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
+### Deprecated
+
+- **This project is deprecated in favour of `gutenberg_kg`, and is no longer
+  maintained.** The two had converged: the OCR and Markdown code is
+  byte-identical between `ia_kg/download_ia.py` and `gutenberg_kg/ia.py`
+  (`clean_ocr`, `_is_heading`, `text_to_markdown`, `_detect_running_headers`,
+  `_find_toc_range`), verified by diffing both repos' parses of Audels Electric
+  Library Vol. 1 -- 20,315 identical lines, differing only in the title line,
+  which comes from the title override rather than the parser.
+
+  Maintaining both cost correctness rather than buying redundancy.
+  `gutenberg_kg` has fixes this repo never received, the significant one being
+  download idempotence keyed on the **IA identifier** instead of the output
+  path. Here, re-running a download with a different `--title` writes a second
+  directory holding the same item, and nothing detects it afterwards.
+
+  Everything is available as `gutenkg ia <subcommand>`, a strict superset.
 
 ### Changed
 
-### Removed
-
-### Fixed
+- The Audels Electric Library corpus moved to `gutenberg_kg` (8 of 10 volumes,
+  all the 1929 public-domain edition). Note that repo also **rejected** a volume
+  this one would have accepted: `audelsnewelectri008004mbp` is a 1962 edition of
+  a different series, with no licence field and a bulk `universallibrary`
+  upload, so it is not safely public domain the way the 1929 set is.
+- `docs/catalog-workflow.md` was ported to `docs/IA_CATALOG_WORKFLOW.md` in
+  `gutenberg_kg`, rewritten for `gutenkg ia` and extended with a rights-checking
+  step this version did not have.
+- The two CLI features `gutenberg_kg` lacked -- `--export-catalog` on search,
+  and genre inference from a catalog's filename stem -- were ported there before
+  retirement rather than lost with the repo.
 
 ## [0.1.1] - 2026-08-03
 
